@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+build/
+dist/
+
+lightning_logs/
+checkpoints/
+wandb/
+
+data/*.txt
+!data/sample.txt
+data/cache/
+reference/
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+
+# Project specific
+/tmp/
+
