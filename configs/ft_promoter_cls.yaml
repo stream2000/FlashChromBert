@@ -1,0 +1,54 @@
+seed: 42
+
+# Promoter gene-expression binary classification
+# Not-expressed (RPKM == 0) vs Expressed (RPKM > 0) — matches paper's
+# "lowly/not expressed vs highly expressed" split.
+task: classification
+
+tokenizer:
+  type: kmer_cstate
+  k: 4
+  num_states: 15
+
+pretrained_ckpt: checkpoints/ch_promoter_tuned/epoch=0-val_loss=0.257.ckpt
+classifier_dropout: 0.1
+
+data:
+  train_file: data/ch_temp/promoter_finetune_data/classification/rpkm0_n_rpkm50/train.tsv
+  val_file: data/ch_temp/promoter_finetune_data/classification/rpkm0_n_rpkm50/dev.tsv
+  has_header: true
+  batch_size: 128
+  max_length: 512
+  num_workers: 8
+
+model:
+  hidden_size: 384
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 1536
+  max_position_embeddings: 512
+  hidden_dropout: 0.1
+  attention_dropout: 0.1
+
+optimizer:
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+
+scheduler:
+  warmup_ratio: 0.1
+
+trainer:
+  max_epochs: 10
+  precision: bf16-mixed
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  log_every_n_steps: 25
+  val_check_interval: 1.0
+  monitor: val_auc
+  monitor_mode: max
+  ckpt_dir: checkpoints/ft_promoter_cls
+  log_name: ft_promoter_cls
+  report_file: docs/runs/2026-04-18_ft_promoter_cls.json

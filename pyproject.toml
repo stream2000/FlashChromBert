@@ -47,6 +47,7 @@ legacy = [
 
 [project.scripts]
 fcbert-pretrain = "flashchrombert.cli.pretrain:main"
+fcbert-finetune = "flashchrombert.cli.finetune:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

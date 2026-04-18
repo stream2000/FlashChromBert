@@ -1,0 +1,7 @@
+{
+  "config": "configs/tmp_ft_rpkm0_n_rpkm50.yaml",
+  "task": "classification",
+  "monitor": "val_auc",
+  "best_score": 0.8716299533843994,
+  "best_ckpt": "/home/fqijun/python/FlashChromBert/checkpoints/ft_cls_batch_rpkm0_n_rpkm50/epoch=4-val_auc=0.8716.ckpt"
+}

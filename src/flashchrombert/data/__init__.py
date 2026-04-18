@@ -6,6 +6,7 @@ from .dataset import (
     RandomFixedLengthDataset,
     StandardMaskingStrategy,
 )
+from .finetune import SeqLabelDataModule, SeqLabelDataset
 from .tokenizer import (
     CharTokenizer,
     CStateTokenizer,
@@ -25,4 +26,6 @@ __all__ = [
     "KmerMaskListMaskingStrategy",
     "MLMDataModule",
     "RandomFixedLengthDataModule",
+    "SeqLabelDataset",
+    "SeqLabelDataModule",
 ]

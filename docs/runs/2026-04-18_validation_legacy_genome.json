@@ -1,0 +1,27 @@
+{
+  "model_dir": "/home/fqijun/python/ChromBERT/data/ch_temp/genome_pretrain_result",
+  "model_label": "legacy_genome",
+  "datasets": {
+    "promoter_val": {
+      "loss": 4.451157833405918,
+      "ppl": 85.72615814208984,
+      "top1": 0.5995380318006016,
+      "top5": 0.7067576278470133,
+      "n_masked": 18616
+    },
+    "crm_ood": {
+      "loss": 9.568407600000846,
+      "ppl": 14305.6240234375,
+      "top1": 0.18222130555842014,
+      "top5": 0.24708672785397545,
+      "n_masked": 9697
+    },
+    "genome_ood": {
+      "loss": 0.17503431720025717,
+      "ppl": 1.1912870407104492,
+      "top1": 0.9428453583134024,
+      "top5": 0.9934532509522545,
+      "n_masked": 361248
+    }
+  }
+}

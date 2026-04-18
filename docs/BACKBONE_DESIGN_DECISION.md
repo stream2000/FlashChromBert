@@ -30,7 +30,22 @@ HF 路径看似"站在巨人肩膀上"，但需要深入讨论后才能判断是
 | Motif 路径的 eager 切换 | 要重新 `from_pretrained(..., attn_implementation="eager")` 整体重载；推理期可行，但和训练态割裂 | 同一个 `nn.Module`，`forward(..., return_attn=True)` 走 eager 分支，权重共享 |
 | 自定义 MLM masking（k-mer `MASK_LIST` 连续遮 k 个 token） | 要 override `BertForMaskedLM` 或在 DataCollator 侧硬塞，还要维护 HF 的 `MaskedLMOutput` dataclass 契约 | LightningModule 里直接写，不经过 HF output dataclass |
 
-### 2.2 性能层面
+### 2.2 架构升级层面 (Post-LN vs Pre-LN)
+
+在重新实现 backbone 时，我们不仅清理了代码，还做出了符合现代 Transformer 审美的关键架构升级，导致了与旧版 ChromBERT 模型（及早期 HuggingFace BERT）的内部行为差异。
+
+- **LayerNorm 顺序 (Post-LN 到 Pre-LN)**：
+  - **旧版** (`modeling_bert.py`) 采用了经典的 **Post-LN** 范式：`LayerNorm(x + SubLayer(x))`。这种设计在较深的网络中容易出现梯度消失问题，往往需要更激进的 Warmup 和较小的学习率。
+  - **新版** (`encoder.py`) 采用了 **Pre-LN** 范式：`x + SubLayer(LayerNorm(x))`，并在最后一层后附加了一个全局 `final_norm`。Pre-LN 的主干（残差连接）是一条直通通道，梯度流动更稳定，更容易训深。
+- **算子融合 (QKV 与 SDPA)**：
+  - **旧版** 将 Self-Attention 和 Output 分别拆为 `BertSelfAttention`（包含三个独立的 Linear：query, key, value）和 `BertSelfOutput`（包含一次降维 Linear）。
+  - **新版** 合并了冗余封装，并在 `attention.py` 中使用了 `qkv_proj`（三个 projection 合并为单次线性变换）。这与 `F.scaled_dot_product_attention` 配合，最大化了内存带宽利用率。
+
+> **⚠️ 兼容性警告 (State Dict)**
+> 
+> 由于 LayerNorm 顺序（Pre-LN vs Post-LN）和结构重组（合并的 QKV），直接将原生 ChromBERT 的 checkpoint (`pytorch_model.bin`) 加载到 `FlashChromBert` 是**完全错误**的（即使参数能通过 shape 匹配硬塞进去，前向传播的张量分布也会因为 Norm 的位置改变而崩溃）。如果未来需要进行“老模型推理”，必须增加一个带有 `use_post_ln=True` 的分支或提供专用的 Legacy-Model 映射机制。
+
+### 2.3 性能层面
 
 - **热路径等价**：HF 现在也走 `F.scaled_dot_product_attention`（4.36+ 的 `sdpa` 后端），在 Ada 上自动选 FA2 kernel。**自写和 HF-SDPA 在 kernel 层是同一条路径**，不存在"自写更快"。
 - **真正的差别**：
@@ -233,3 +248,68 @@ def load_dnabert2_into_chrombert(hf_ckpt: str, model: ChromBERTModel, *,
 ### 何时应反悔去用 HF
 
 如果未来想接 HF Hub 上的 DNA 预训练模型做迁移学习，那时写一个 `integrations/hf_adapter.py` 即可——而不是反过来把主 backbone 绑上 HF。
+
+## 六、附录：Encoder 函数调用与依赖树对比 (用于代码 Review)
+
+为了方便进行人工代码 Review 和架构比对，以下梳理了新旧两版 Encoder 的函数依赖树及张量流转差异：
+
+### 1. 原生项目 (ChromBERT - Post-LN 架构)
+**文件位置**：`ChromBERT/training/src/transformers/modeling_bert.py`
+
+```text
+BertEncoder.forward()
+ ├── 循环调用 self.layer [BertLayer] (config.num_hidden_layers 次)
+ │    │
+ │    ├── BertLayer.forward()
+ │    │    ├── 1. self.attention [BertAttention]
+ │    │    │    ├── self.self [BertSelfAttention]
+ │    │    │    │    ├── nn.Linear (query)
+ │    │    │    │    ├── nn.Linear (key)
+ │    │    │    │    ├── nn.Linear (value)
+ │    │    │    │    └── softmax + dropout 组合计算 Attention Score
+ │    │    │    └── self.output [BertSelfOutput]
+ │    │    │         ├── nn.Linear (dense projection)
+ │    │    │         ├── nn.Dropout
+ │    │    │         └── nn.LayerNorm (★ Post-LN：作用于 x + f(x))
+ │    │    │
+ │    │    ├── 2. self.intermediate [BertIntermediate]
+ │    │    │    ├── nn.Linear (全连接层：升维至 intermediate_size)
+ │    │    │    └── act_fn (GELU)
+ │    │    │
+ │    │    └── 3. self.output [BertOutput]
+ │    │         ├── nn.Linear (全连接层：降维至 hidden_size)
+ │    │         ├── nn.Dropout
+ │    │         └── nn.LayerNorm (★ Post-LN：作用于 x + f(x))
+ │    │
+ │    └── (打包返回 attentions / hidden_states)
+```
+
+### 2. 重构项目 (FlashChromBert - Pre-LN 架构)
+**文件位置**：`FlashChromBert/src/flashchrombert/model/encoder.py` 及 `attention.py`
+
+```text
+BertEncoder.forward()
+ ├── 循环调用 self.layers [TransformerBlock] (config.num_hidden_layers 次)
+ │    │
+ │    ├── TransformerBlock.forward()
+ │    │    ├── 1. self.norm1 [nn.LayerNorm] (★ Pre-LN：先做归一化)
+ │    │    │
+ │    │    ├── 2. self.attn [MultiHeadAttention] (位于 attention.py)
+ │    │    │    ├── nn.Linear (qkv_proj，三合一合并计算)
+ │    │    │    ├── F.scaled_dot_product_attention (SDPA，动态分发)
+ │    │    │    └── nn.Linear (out_proj)
+ │    │    │
+ │    │    ├── 3. 残差相加 (x = x + attn_out)
+ │    │    │
+ │    │    ├── 4. self.norm2 [nn.LayerNorm] (★ Pre-LN：先做归一化)
+ │    │    │
+ │    │    ├── 5. self.ffn [FeedForward]
+ │    │    │    ├── self.fc1 [nn.Linear]
+ │    │    │    ├── self.act [nn.GELU]
+ │    │    │    ├── self.fc2 [nn.Linear]
+ │    │    │    └── self.dropout [nn.Dropout]
+ │    │    │
+ │    │    └── 6. 残差相加 (x = x + ffn_out)
+ │    │
+ └── self.final_norm [nn.LayerNorm] (★ Pre-LN 循环后的全局最后归一化)
+```

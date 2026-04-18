@@ -60,6 +60,7 @@ class MLMDataModule(L.LightningDataModule):
             num_workers=self.num_workers,
             collate_fn=self._collate(),
             pin_memory=True,
+            persistent_workers=self.num_workers > 0,
         )
 
     def val_dataloader(self):
@@ -72,6 +73,7 @@ class MLMDataModule(L.LightningDataModule):
             num_workers=self.num_workers,
             collate_fn=self._collate(),
             pin_memory=True,
+            persistent_workers=self.num_workers > 0,
         )
 
 

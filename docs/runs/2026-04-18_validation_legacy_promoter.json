@@ -1,0 +1,27 @@
+{
+  "model_dir": "/home/fqijun/python/ChromBERT/data/ch_temp/promoter_pretrain_result",
+  "model_label": "legacy_promoter",
+  "datasets": {
+    "promoter_val": {
+      "loss": 0.27452295862232723,
+      "ppl": 1.315902829170227,
+      "top1": 0.9186183927804039,
+      "top5": 0.9830253545337344,
+      "n_masked": 18616
+    },
+    "crm_ood": {
+      "loss": 0.6602269173867258,
+      "ppl": 1.9352314472198486,
+      "top1": 0.8718160255749201,
+      "top5": 0.9267814788078788,
+      "n_masked": 9697
+    },
+    "genome_ood": {
+      "loss": 6.574215848005127,
+      "ppl": 716.3836669921875,
+      "top1": 0.48099643458233676,
+      "top5": 0.5643297679156701,
+      "n_masked": 361248
+    }
+  }
+}

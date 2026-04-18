@@ -1,0 +1,7 @@
+{
+  "config": "configs/ft_promoter_reg.yaml",
+  "task": "regression",
+  "monitor": "val_pearson",
+  "best_score": 0.735111653804779,
+  "best_ckpt": "/home/fqijun/python/FlashChromBert/checkpoints/ft_promoter_reg/epoch=2-val_pearson=0.7351.ckpt"
+}

@@ -1,0 +1,52 @@
+seed: 42
+
+# Promoter gene-expression regression (log-RPKM)
+task: regression
+
+tokenizer:
+  type: kmer_cstate
+  k: 4
+  num_states: 15
+
+pretrained_ckpt: checkpoints/ch_promoter_tuned/epoch=0-val_loss=0.257.ckpt
+classifier_dropout: 0.2   # paper used 0.2 for the regression run
+
+data:
+  train_file: data/ch_temp/promoter_finetune_data/regression/train.tsv
+  val_file: data/ch_temp/promoter_finetune_data/regression/dev.tsv
+  has_header: false
+  batch_size: 32
+  max_length: 512
+  num_workers: 4
+
+model:
+  hidden_size: 384
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 1536
+  max_position_embeddings: 512
+  hidden_dropout: 0.1
+  attention_dropout: 0.1
+
+optimizer:
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+
+scheduler:
+  warmup_ratio: 0.2
+
+trainer:
+  max_epochs: 10
+  precision: bf16-mixed
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  log_every_n_steps: 50
+  val_check_interval: 1.0
+  monitor: val_pearson
+  monitor_mode: max
+  ckpt_dir: checkpoints/ft_promoter_reg
+  log_name: ft_promoter_reg
+  report_file: docs/runs/2026-04-18_ft_promoter_reg.json

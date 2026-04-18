@@ -1,0 +1,47 @@
+seed: 42
+
+tokenizer:
+  type: kmer_cstate
+  k: 4
+  num_states: 15
+
+masking:
+  type: kmer_mask_list
+  k: 4
+  mlm_probability: 0.0375
+
+data:
+  kind: file
+  train_file: data/ch_temp/promoter_pretrain_data/train_split.txt
+  val_file: null
+  batch_size: 16          # 🚀 降低单卡物理 Batch 以腾出显存给 2048 长度的 Logits
+  max_length: 2048        # 🚀 保持长上下文
+  num_workers: 16         # 🚀 保持 I/O 并行
+
+model:
+  hidden_size: 768        # 🚀 保持 BERT-Base 规模
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 3072
+  max_position_embeddings: 2048
+  hidden_dropout: 0.1
+  attention_dropout: 0.1
+
+optimizer:
+  learning_rate: 4.0e-4
+  weight_decay: 0.01
+
+scheduler:
+  warmup_steps: 100
+  total_steps: 1000
+
+trainer:
+  max_steps: 100          
+  precision: bf16-mixed
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  accumulate_grad_batches: 16 # 🚀 有效 Batch = 16 * 4 * 16 = 1024
+  gradient_clip_val: 1.0
+  log_every_n_steps: 5
+  ckpt_dir: checkpoints/ch_scale_test

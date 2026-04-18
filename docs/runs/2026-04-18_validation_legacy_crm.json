@@ -1,0 +1,27 @@
+{
+  "model_dir": "/home/fqijun/python/ChromBERT/data/ch_temp/crm_pretrain_result",
+  "model_label": "legacy_crm",
+  "datasets": {
+    "promoter_val": {
+      "loss": 1.9367787584720069,
+      "ppl": 6.936371326446533,
+      "top1": 0.6563171465406102,
+      "top5": 0.7955522131499785,
+      "n_masked": 18616
+    },
+    "crm_ood": {
+      "loss": 0.5853420987704513,
+      "ppl": 1.795605182647705,
+      "top1": 0.8759410126843353,
+      "top5": 0.9445189233783644,
+      "n_masked": 9697
+    },
+    "genome_ood": {
+      "loss": 3.9935492006075983,
+      "ppl": 54.24707794189453,
+      "top1": 0.39014748870581983,
+      "top5": 0.5306686819027372,
+      "n_masked": 361248
+    }
+  }
+}
