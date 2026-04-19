@@ -29,27 +29,7 @@ pip install -e ".[legacy]"
 
 ## Quick Start
 
-### 1. Training (MLM)
-```bash
-# Run a baseline pre-training session
-fcbert-pretrain --config configs/base/ch_promoter_tuned.yaml
-```
-
-### 2. Fine-tuning
-```bash
-# Fine-tune on promoter classification tasks
-fcbert-finetune --config configs/base/ft_promoter_cls.yaml
-```
-
-### 3. Analysis
-We provide scripts to bridge the new model checkpoints with the original analysis pipeline:
-```bash
-# Dump attention scores for motif identification
-python scripts/utils/dump_attention.py --ckpt <path_to_ckpt> --out-dir logs/motif/output --task classification
-
-# Run original motif finding logic
-python -m flashchrombert.legacy.find_motifs --data_dir <data_path> --predict_dir logs/motif/output --save_file_dir logs/motif/output/result
-```
+For step-by-step instructions covering all four experiments (promoter pre-training, fine-tuning, whole-genome pre-training, and motif extraction), see **[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md)**.
 
 ## Acknowledgments
 
