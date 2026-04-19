@@ -70,6 +70,7 @@ class Tokenizer(ABC):
         return "".join(tokens)
 
 
+# [smoke] used only in unit tests and smoke runs; not for real chromatin data
 class CharTokenizer(Tokenizer):
     """Character-level tokenizer for text pretraining demos.
 

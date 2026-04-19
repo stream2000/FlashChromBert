@@ -122,6 +122,15 @@ class LitBertFinetune(L.LightningModule):
             return
         preds = torch.cat(self._val_preds, dim=0)
         labels = torch.cat(self._val_labels, dim=0)
+        self._val_preds.clear()
+        self._val_labels.clear()
+
+        # Bug fix: gather preds/labels across DDP ranks before computing metrics.
+        # Each rank accumulates only its own shard; averaging per-shard AUC/Pearson
+        # is not equivalent to the global metric, so we must all_gather first.
+        if self.trainer.world_size > 1:
+            preds = self.all_gather(preds.to(self.device)).flatten(0, 1).cpu()
+            labels = self.all_gather(labels.to(self.device)).flatten(0, 1).cpu()
 
         if self.task == "classification":
             # preds: [N, num_labels], labels: [N] long
@@ -159,9 +168,6 @@ class LitBertFinetune(L.LightningModule):
             r_spearman = float(spearmanr(pn, ln).statistic)
             self.log("val_pearson", r_pearson, prog_bar=True, sync_dist=True)
             self.log("val_spearman", r_spearman, prog_bar=True, sync_dist=True)
-
-        self._val_preds.clear()
-        self._val_labels.clear()
 
     def configure_optimizers(self):
         no_decay = ("bias", "LayerNorm.weight", "norm.weight")

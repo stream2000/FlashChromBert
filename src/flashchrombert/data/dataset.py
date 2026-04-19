@@ -57,24 +57,28 @@ class KmerMaskListMaskingStrategy(MaskingStrategy):
         for sid in specials:
             special_mask |= labels == sid
         prob.masked_fill_(special_mask, 0.0)
-        pad_mask = labels == tokenizer.pad_token_id
-        prob.masked_fill_(pad_mask, 0.0)
+        # Bug fix: no separate pad_mask needed — PAD is in SPECIAL_TOKENS so
+        # special_mask already zeroes it out.
 
         masked_indices = torch.bernoulli(prob).bool()
 
         # Expand each selected center with MASK_LIST offsets, clamped to
-        # [1, end], where `end` is the last position with non-zero probability.
+        # [first, end] — the range of valid (non-special, non-pad) positions.
+        # Bug fix: use `first` derived from nonzero instead of hardcoded 1,
+        # so sequences without a leading [CLS] (e.g. RandomFixedLengthDataset)
+        # are not biased against position 0.
         for i in range(masked_indices.shape[0]):
             nonzero = torch.nonzero(prob[i] != 0, as_tuple=False)
             if nonzero.numel() == 0:
                 continue
+            first = int(nonzero[0].item())
             end = int(nonzero[-1].item())
             centers = set(torch.nonzero(masked_indices[i], as_tuple=False).view(-1).tolist())
             new_centers = set(centers)
             for c in centers:
                 for off in mask_list:
                     j = c + off
-                    if 1 <= j <= end:
+                    if first <= j <= end:
                         new_centers.add(j)
             if new_centers:
                 idx = torch.tensor(sorted(new_centers), dtype=torch.long)
@@ -152,8 +156,11 @@ class MLMDataset(Dataset):
         return len(self.lines)
 
     def __getitem__(self, idx: int) -> torch.Tensor:
-        ids = self.tokenizer.encode(self.lines[idx], add_special=True)
-        ids = ids[: self.max_length]
+        # Bug fix: encode without specials first, then truncate to max_length-2,
+        # so [SEP] is never dropped when the line is long.
+        ids = self.tokenizer.encode(self.lines[idx], add_special=False)
+        ids = ids[: self.max_length - 2]
+        ids = [self.tokenizer.cls_token_id] + ids + [self.tokenizer.sep_token_id]
         return torch.tensor(ids, dtype=torch.long)
 
 
@@ -193,6 +200,7 @@ class StreamingMLMDataset(IterableDataset):
                     yield torch.tensor(chunk_with_specials, dtype=torch.long)
 
 
+# [smoke] synthetic data for SDPA/FlashAttention path verification; not for real training
 class RandomFixedLengthDataset(Dataset):
     """Synthetic fixed-length token streams drawn uniformly from non-special ids.
 
@@ -210,18 +218,20 @@ class RandomFixedLengthDataset(Dataset):
         self.tokenizer = tokenizer
         self.num_samples = num_samples
         self.seq_len = seq_len
+        self.seed = seed
         specials = tokenizer.special_token_ids()
         self.content_ids = torch.tensor(
             [i for i in range(tokenizer.vocab_size) if i not in specials],
             dtype=torch.long,
         )
-        self.generator = torch.Generator().manual_seed(seed)
 
     def __len__(self) -> int:
         return self.num_samples
 
     def __getitem__(self, idx: int) -> torch.Tensor:
-        g = torch.Generator().manual_seed(hash((idx,)) & 0xFFFFFFFF)
+        # Bug fix: incorporate self.seed into the generator seed so that
+        # different `seed` values produce different sample sequences.
+        g = torch.Generator().manual_seed(hash((self.seed, idx)) & 0xFFFFFFFF)
         picks = torch.randint(
             high=len(self.content_ids), size=(self.seq_len,), generator=g
         )

@@ -137,6 +137,7 @@ class StreamingMLMDataModule(L.LightningDataModule):
         )
 
 
+# [smoke] synthetic data for SDPA/FlashAttention path verification; not for real training
 class RandomFixedLengthDataModule(L.LightningDataModule):
     """Synthetic fixed-length data — no padding, so SDPA can use FlashAttention.
 
