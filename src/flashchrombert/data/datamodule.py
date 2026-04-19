@@ -11,6 +11,7 @@ from .dataset import (
     MLMDataset,
     RandomFixedLengthDataset,
     StandardMaskingStrategy,
+    StreamingMLMDataset,
     collate_mlm,
 )
 from .tokenizer import Tokenizer
@@ -70,6 +71,65 @@ class MLMDataModule(L.LightningDataModule):
             self.val_ds,
             batch_size=self.batch_size,
             shuffle=False,
+            num_workers=self.num_workers,
+            collate_fn=self._collate(),
+            pin_memory=True,
+            persistent_workers=self.num_workers > 0,
+        )
+
+
+class StreamingMLMDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        train_file: str | Path,
+        val_file: str | Path | None,
+        tokenizer: Tokenizer,
+        batch_size: int = 32,
+        max_length: int = 128,
+        num_workers: int = 2,
+        masking: MaskingStrategy | None = None,
+    ):
+        super().__init__()
+        self.train_file = train_file
+        self.val_file = val_file
+        self.tokenizer = tokenizer
+        self.batch_size = batch_size
+        self.max_length = max_length
+        self.num_workers = num_workers
+        self.masking = masking or StandardMaskingStrategy()
+
+    def setup(self, stage: str | None = None) -> None:
+        self.train_ds = StreamingMLMDataset(self.train_file, self.tokenizer, self.max_length)
+        self.val_ds = (
+            StreamingMLMDataset(self.val_file, self.tokenizer, self.max_length)
+            if self.val_file
+            else None
+        )
+
+    def _collate(self):
+        return partial(
+            collate_mlm,
+            tokenizer=self.tokenizer,
+            masking=self.masking,
+            max_length=self.max_length,
+        )
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.train_ds,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=self._collate(),
+            pin_memory=True,
+            persistent_workers=self.num_workers > 0,
+        )
+
+    def val_dataloader(self):
+        if self.val_ds is None:
+            return []
+        return DataLoader(
+            self.val_ds,
+            batch_size=self.batch_size,
             num_workers=self.num_workers,
             collate_fn=self._collate(),
             pin_memory=True,

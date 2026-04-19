@@ -16,6 +16,7 @@ from ..data import (
     MLMDataModule,
     RandomFixedLengthDataModule,
     StandardMaskingStrategy,
+    StreamingMLMDataModule,
     Tokenizer,
 )
 from ..lightning import LitBertMLM
@@ -55,6 +56,16 @@ def build_datamodule(cfg: dict, tokenizer: Tokenizer):
     masking = build_masking(cfg.get("masking"))
     if kind == "file":
         return MLMDataModule(
+            train_file=data["train_file"],
+            val_file=data.get("val_file"),
+            tokenizer=tokenizer,
+            batch_size=data["batch_size"],
+            max_length=data["max_length"],
+            num_workers=data.get("num_workers", 2),
+            masking=masking,
+        )
+    if kind == "stream":
+        return StreamingMLMDataModule(
             train_file=data["train_file"],
             val_file=data.get("val_file"),
             tokenizer=tokenizer,

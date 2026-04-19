@@ -15,9 +15,9 @@ data:
   train_file: data/ch_temp/promoter_finetune_data/regression/train.tsv
   val_file: data/ch_temp/promoter_finetune_data/regression/dev.tsv
   has_header: false
-  batch_size: 32
+  batch_size: 64
   max_length: 512
-  num_workers: 4
+  num_workers: 16
 
 model:
   hidden_size: 384
@@ -29,7 +29,7 @@ model:
   attention_dropout: 0.1
 
 optimizer:
-  learning_rate: 2.0e-5
+  learning_rate: 5.0e-5
   weight_decay: 0.01
 
 scheduler:

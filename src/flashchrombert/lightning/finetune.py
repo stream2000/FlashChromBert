@@ -60,6 +60,7 @@ class LitBertFinetune(L.LightningModule):
         num_labels: int,
         pretrained_ckpt: str | Path | None = None,
         classifier_dropout: float | None = None,
+        freeze_backbone: bool = False,
         learning_rate: float = 2e-5,
         weight_decay: float = 0.01,
         warmup_ratio: float = 0.1,
@@ -87,6 +88,14 @@ class LitBertFinetune(L.LightningModule):
                 f"[finetune] loaded {pretrained_ckpt}: "
                 f"missing={len(missing)} unexpected={len(unexpected)}"
             )
+
+        if freeze_backbone:
+            for p in self.model.bert.parameters():
+                p.requires_grad_(False)
+            n_frozen = sum(p.numel() for p in self.model.bert.parameters())
+            n_head = sum(p.numel() for p in self.model.head.parameters())
+            print(f"[finetune] backbone frozen ({n_frozen:,} params); "
+                  f"head trainable ({n_head:,} params)")
 
         self._val_preds: list[torch.Tensor] = []
         self._val_labels: list[torch.Tensor] = []

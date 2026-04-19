@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, IterableDataset
 
 from .tokenizer import Tokenizer
 
@@ -155,6 +155,42 @@ class MLMDataset(Dataset):
         ids = self.tokenizer.encode(self.lines[idx], add_special=True)
         ids = ids[: self.max_length]
         return torch.tensor(ids, dtype=torch.long)
+
+
+class StreamingMLMDataset(IterableDataset):
+    """Streaming line-by-line MLM dataset. Lines are chunked into max_length segments."""
+
+    def __init__(
+        self,
+        file_path: str | Path,
+        tokenizer: Tokenizer,
+        max_length: int = 128,
+    ):
+        self.file_path = file_path
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.chunk_size = max_length - 2
+
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+        with open(self.file_path, encoding="utf-8") as f:
+            for i, line in enumerate(f):
+                if worker_info is not None:
+                    if i % worker_info.num_workers != worker_info.id:
+                        continue
+                line = line.strip()
+                if not line:
+                    continue
+                # Encode without special tokens so we can chunk properly
+                ids = self.tokenizer.encode(line, add_special=False)
+                
+                # Yield chunks of length `chunk_size`
+                for j in range(0, len(ids), self.chunk_size):
+                    chunk = ids[j : j + self.chunk_size]
+                    if not chunk:
+                        continue
+                    chunk_with_specials = [self.tokenizer.cls_token_id] + chunk + [self.tokenizer.sep_token_id]
+                    yield torch.tensor(chunk_with_specials, dtype=torch.long)
 
 
 class RandomFixedLengthDataset(Dataset):

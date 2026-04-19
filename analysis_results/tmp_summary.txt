@@ -1,0 +1,14 @@
+==========================================================================================
+Dataset                        | Model            | Count  | Avg Len  | Avg TDS  | TDS>=1 (%)
+------------------------------------------------------------------------------------------
+cls_not_n_rpkm0                | Random-Init      | 0      | 0.0      | 0.0      | 0.0       
+cls_not_n_rpkm0                | Pretrained (WG)  | 0      | 0.0      | 0.0      | 0.0       
+cls_not_n_rpkm50               | Random-Init      | 0      | 0.0      | 0.0      | 0.0       
+cls_not_n_rpkm50               | Pretrained (WG)  | 34     | 7.0      | 0.85     | 79.41     
+cls_rpkm0_n_rpkm20             | Random-Init      | 1      | 6.0      | 0.0      | 0.0       
+cls_rpkm0_n_rpkm20             | Pretrained (WG)  | 60     | 7.57     | 0.73     | 73.33     
+cls_rpkm10_n_rpkm50            | Random-Init      | 0      | 0.0      | 0.0      | 0.0       
+cls_rpkm10_n_rpkm50            | Pretrained (WG)  | 0      | 0.0      | 0.0      | 0.0       
+ft_cls                         | Random-Init      | 2      | 5.5      | 0.5      | 50.0      
+ft_cls                         | Pretrained (WG)  | 14     | 6.57     | 0.71     | 71.43     
+==========================================================================================

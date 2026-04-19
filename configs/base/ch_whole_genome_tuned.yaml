@@ -1,0 +1,58 @@
+seed: 42
+
+tokenizer:
+  # 实测 pretrain_genome_all.txt 的字符集为 A-O（15 字母），无 P/Q/R，
+  # 是 ROADMAP 15 态 + 全基因组的项目自造语料，vocab = 15^4 + 5 = 50,630。
+  # 不是论文 §503-529 的 IHEC 18 态全基因组。
+  type: kmer_cstate
+  k: 4
+  num_states: 15
+
+masking:
+  type: kmer_mask_list
+  k: 4
+  mlm_probability: 0.0375  # × MASK_LIST[4] 4-位扩展 = 有效遮罩率 15% (论文 §515)
+
+data:
+  kind: stream
+  train_file: data/ch_temp/genome_pretrain_data/pretrain_genome_all.txt
+  batch_size: 88
+  max_length: 512
+  num_workers: 4
+
+model:
+  # 数据是 ROADMAP 15 态（与 promoter 同体系），且无 legacy 全基因组 checkpoint 存在，
+  # 保持与 ch_promoter_tuned 相同的 384/1536 架构以便下游可直接对齐／互比。
+  # 论文 §496-497 写的 768/3072 是 DNABERT 同款，可作为后续 scaling 实验的对照。
+  hidden_size: 384
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 1536
+  max_position_embeddings: 512
+  hidden_dropout: 0.1
+  attention_dropout: 0.1
+
+optimizer:
+  # 论文 §500 给 4e-4 peak。promoter tuned 实践按 sqrt-scaling 保守取 3e-4 跑到 val_loss 0.257，
+  # 全基因组有效 batch / 架构宽度都变了，继续沿用 3e-4 保持可比性；必要时再探 4e-4。
+  learning_rate: 3.0e-4
+  weight_decay: 0.01
+
+scheduler:
+  warmup_steps: 1000
+  total_steps: 10000
+
+trainer:
+  # 10k 步沿用 promoter 惯例。实测数据 3041 行 / 3.1GB ≈ 620M tokens ≈ 1.2M 个 512-token 样本，
+  # effective_batch=512 × 10k = 5.1M 样本次 ≈ 4 epoch。MLM 每 epoch 随机遮罩不同位置，
+  # 过拟合风险尚可控；若 train_loss 后期出现反弹再考虑缩步或补 val。
+  max_steps: 10000
+  precision: bf16-mixed
+  accelerator: gpu
+  devices: [1, 2, 3]
+  strategy: ddp
+  accumulate_grad_batches: 2
+  gradient_clip_val: 1.0
+  log_every_n_steps: 25
+  ckpt_dir: checkpoints/ch_whole_genome_tuned_v2
+

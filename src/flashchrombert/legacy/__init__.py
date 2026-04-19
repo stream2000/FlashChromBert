@@ -1,8 +1,9 @@
-# Verbatim copy of chrombert_utils from the original ChromBERT repo.
-# Do not edit css_utility.py — adapters go in flashchrombert.data, not here.
+# Verbatim copies of utility modules from the original ChromBERT repo.
+# Do not edit these files — adapters live in flashchrombert.data, not here.
 #
-# Heavy deps (matplotlib, seaborn, networkx, tslearn, umap-learn, biopython,
-# logomaker, wordcloud, scipy, pybedtools, …) are only pulled in when you
-# actually import this package. Install them via the `legacy` extra:
-#     pip install -e .[legacy]
-from .css_utility import *  # noqa: F401,F403
+# Submodules have disjoint heavy-dep trees, so we do NOT eagerly import them
+# here. Pull in only what you need:
+#     from flashchrombert.legacy import css_utility    # needs matplotlib/tslearn/networkx/…
+#     from flashchrombert.legacy import motif_utils    # needs scipy/statsmodels/biopython/ahocorasick
+#     from flashchrombert.legacy import find_motifs    # CLI: python -m flashchrombert.legacy.find_motifs
+# Install the full legacy extra via:  pip install -e .[legacy]

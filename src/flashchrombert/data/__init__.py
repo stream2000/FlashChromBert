@@ -1,10 +1,11 @@
-from .datamodule import MLMDataModule, RandomFixedLengthDataModule
+from .datamodule import MLMDataModule, RandomFixedLengthDataModule, StreamingMLMDataModule
 from .dataset import (
     KmerMaskListMaskingStrategy,
     MaskingStrategy,
     MLMDataset,
     RandomFixedLengthDataset,
     StandardMaskingStrategy,
+    StreamingMLMDataset,
 )
 from .finetune import SeqLabelDataModule, SeqLabelDataset
 from .tokenizer import (
@@ -23,8 +24,10 @@ __all__ = [
     "MLMDataset",
     "RandomFixedLengthDataset",
     "StandardMaskingStrategy",
+    "StreamingMLMDataset",
     "KmerMaskListMaskingStrategy",
     "MLMDataModule",
+    "StreamingMLMDataModule",
     "RandomFixedLengthDataModule",
     "SeqLabelDataset",
     "SeqLabelDataModule",

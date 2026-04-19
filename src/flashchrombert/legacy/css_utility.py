@@ -2713,7 +2713,7 @@ def motif_init2pred(input_path="./init_concat.csv", categorical=False, fillna_me
         if fillna_method==0:
             X_train_filled = X_train.fillna(0)
         if fillna_method=="ffill":
-            X_train_filled = X_train.fillna(method=fillna_method)
+            X_train_filled = X_train.ffill()
         n_columns = X_train_filled.shape[1]
         # print(f"Number of entries after filling NaNs: {n_columns}")  # Debug print
 
@@ -2724,7 +2724,7 @@ def motif_init2pred(input_path="./init_concat.csv", categorical=False, fillna_me
         if fillna_method==0:
             X_train_filled_rev = X_train_rev.fillna(0)
         if fillna_method=="ffill":
-            X_train_filled_rev = X_train_rev.fillna(method=fillna_method)
+            X_train_filled_rev = X_train_rev.ffill()
         # X_train_filled_rev = X_train_rev.fillna(fillna_method)  # Fill missing values with zero
 
     def categorical_distance(a, b):
@@ -3007,7 +3007,7 @@ def motif_init2umap(input_path="./init_concat.csv",categorical=False,  n_cluster
         if fillna_method==0:
             X_train_filled = X_train.fillna(0)
         if fillna_method=="ffill":
-            X_train_filled = X_train.fillna(method=fillna_method)
+            X_train_filled = X_train.ffill()
 
         dtw_distance_matrix, y_pred = motif_init2pred(input_path=input_path, categorical=categorical, n_clusters=n_clusters, fillna_method=fillna_method, linkage_method=linkage_method)
 

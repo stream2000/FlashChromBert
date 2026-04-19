@@ -11,8 +11,6 @@ lightning_logs/
 checkpoints/
 wandb/
 
-data/*.txt
-!data/sample.txt
 data/cache/
 reference/
 
@@ -25,6 +23,11 @@ reference/
 /tmp/
 
 logs/
-data/ChromBERT_ver01_light.zip
+data/*
 data/ch_temp/
 fixtures/
+
+
+docs/ref
+configs/archive/
+docs/ref/motif_clustering_results

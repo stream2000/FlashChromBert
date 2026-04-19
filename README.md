@@ -45,7 +45,7 @@ src/flashchrombert/
 Chromatin-state support is wired: `KmerCStateTokenizer` + `KmerMaskListMaskingStrategy`
 in `src/flashchrombert/data/`, with the legacy preprocessing (`css_utility.py`)
 copied verbatim under `src/flashchrombert/legacy/`. See
-[`docs/LEGACY_MIGRATION.md`](docs/LEGACY_MIGRATION.md) for the migration contract
+[`docs/LEGACY_MIGRATION.md`](docs/ref/plans/LEGACY_MIGRATION.md) for the migration contract
 (copy-verbatim, never edit; adapters go in sibling modules).
 
 Quick runs:

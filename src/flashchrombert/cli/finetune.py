@@ -80,6 +80,7 @@ def main(argv: list[str] | None = None) -> None:
         num_labels=num_labels,
         pretrained_ckpt=cfg.get("pretrained_ckpt"),
         classifier_dropout=cfg.get("classifier_dropout"),
+        freeze_backbone=cfg.get("freeze_backbone", False),
         learning_rate=cfg["optimizer"]["learning_rate"],
         weight_decay=cfg["optimizer"].get("weight_decay", 0.01),
         warmup_ratio=cfg["scheduler"].get("warmup_ratio", 0.1),
