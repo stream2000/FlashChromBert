@@ -40,7 +40,7 @@ Key parameters:
 ### Run
 
 ```bash
-fcbert-pretrain --config configs/archive/ch_promoter_tuned.yaml
+fcbert-pretrain --config configs/base/ch_promoter_tuned.yaml
 ```
 
 Checkpoints are saved to `checkpoints/ch_promoter_tuned/` (top-3 by val loss).
