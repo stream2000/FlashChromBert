@@ -14,6 +14,8 @@ cd /home/fqijun/python/FlashChromBert
 source ./activate.sh
 ```
 
+`fcbert-pretrain` and `fcbert-finetune` are CLI entry points registered by `pip install -e .` (defined in `pyproject.toml`). They read a YAML config and call PyTorch Lightning's `trainer.fit` — no extra arguments beyond `--config`.
+
 ---
 
 ## 1. Promoter Pre-training
@@ -23,7 +25,7 @@ source ./activate.sh
 ### Config
 
 ```
-configs/archive/ch_promoter_tuned.yaml
+configs/base/ch_promoter_tuned.yaml
 ```
 
 Key parameters:
@@ -262,7 +264,7 @@ Each split produces two result directories under `logs/motif/cls_<split>_{wg,ran
 
 | Experiment | Config | Saved checkpoint |
 |---|---|---|
-| Promoter pre-train | `configs/archive/ch_promoter_tuned.yaml` | `checkpoints/archive/ch_promoter_tuned/epoch=0-val_loss=0.257.ckpt` |
+| Promoter pre-train | `configs/base/ch_promoter_tuned.yaml` | `checkpoints/archive/ch_promoter_tuned/epoch=0-val_loss=0.257.ckpt` |
 | Promoter cls fine-tune | `configs/base/ft_promoter_cls.yaml` | `checkpoints/ft/ft_cls/archive_base/epoch=2-val_auc=0.8713.ckpt` |
 | Promoter reg fine-tune | `configs/base/ft_promoter_reg.yaml` | `checkpoints/ft/ft_reg/production/ft_promoter_reg/epoch=4-val_pearson=0.7396.ckpt` |
 | Whole-genome pre-train | `configs/base/ch_whole_genome_tuned.yaml` | `checkpoints/production/ch_whole_genome_tuned_v2/epoch=1-val_loss=0.000.ckpt` |
