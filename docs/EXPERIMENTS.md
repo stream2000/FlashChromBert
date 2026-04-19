@@ -256,6 +256,19 @@ bash scripts/motif/batch_run_motifs.sh
 
 Each split produces two result directories under `logs/motif/cls_<split>_{wg,random}/result/`.
 
+### Motif Extraction as AUC-independent Validation
+
+When classification AUC for pretrained vs. random-init models are nearly identical (e.g., 0.877 vs 0.872), it might seem that pre-training provided no benefit. However, motif extraction reveals a stark difference in what the models have actually learned.
+
+On the `rpkm0_n_rpkm50` split:
+
+| Model | Val AUC | # Enriched Motifs | Structure |
+|---|---|---|---|
+| **WG Pretrained** | 0.8770 | **14** | Diverse: `AAAAAAA` (TSS), `BBAAA` (flanking), `EEDDD` (tx transitions), `CCCCCCCCC` (CTCF), etc. |
+| **Random-init** | 0.8725 | 2 | Trivial: `AAAAA`, `AAAAAC` (A-repeat shortcuts only) |
+
+**Conclusion**: The random-init model achieves high AUC by latching onto simple k-mer shortcuts (like A-repeats in promoters). The WG-pretrained model, having seen ~3 GB of genomic sequences, uses its attention to identify complex, biologically meaningful multi-state transitions that the random model fails to capture.
+
 > **Note — regression motif analysis**: `scripts/motif/batch_run_reg_motifs.sh` exists but the underlying `find_motifs` script (ported verbatim from ChromBERT) only supports binary-labelled data — it splits samples by `label == 0` vs `label == 1`. Regression labels are continuous RPKM values, so no positive/negative split is possible. Use one of the classification splits above as a proxy for expression-based motif discovery.
 
 ---
