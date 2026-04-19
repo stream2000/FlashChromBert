@@ -69,6 +69,7 @@ class BertForMaskedLM(nn.Module):
         self.config = config
         self.bert = BertModel(config)
         self.mlm_head = MLMHead(config)
+        self.mlm_head.apply(self.bert._init_weights)
         self.mlm_head.tie_weights(self.bert.embeddings.token)
 
     def forward(
@@ -113,6 +114,7 @@ class BertForSequenceClassification(nn.Module):
         self.head = SequenceClassificationHead(
             config, num_labels=num_labels, dropout=classifier_dropout
         )
+        self.head.apply(self.bert._init_weights)
 
     def forward(
         self,

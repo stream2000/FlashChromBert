@@ -46,6 +46,55 @@ def test_sdpa_matches_eager():
     assert torch.allclose(out_eager, out_sdpa, atol=1e-5)
 
 
+def test_sdpa_matches_eager_with_mask():
+    """With a padding mask, the two paths must agree (bool mask vs additive -inf)."""
+    cfg = tiny_config()
+    cfg.attention_dropout = 0.0
+    cfg.hidden_dropout = 0.0
+    attn = MultiHeadAttention(cfg).eval()
+    torch.manual_seed(0)
+    x = torch.randn(2, 16, cfg.hidden_size)
+    mask = torch.ones(2, 16, dtype=torch.long)
+    mask[0, 12:] = 0
+    mask[1, 8:] = 0
+    with torch.no_grad():
+        out_eager, _ = attn(x, attention_mask=mask, return_attn=True)
+        out_sdpa, _ = attn(x, attention_mask=mask, return_attn=False)
+    assert torch.allclose(out_eager, out_sdpa, atol=1e-5)
+
+
+def test_head_init_std_matches_config():
+    """MLM and classification heads must use config.initializer_range, not PyTorch defaults."""
+    from flashchrombert.model import BertForSequenceClassification
+
+    cfg = BertConfig(
+        vocab_size=64, hidden_size=128, num_hidden_layers=2,
+        num_attention_heads=4, intermediate_size=256,
+        max_position_embeddings=32, initializer_range=0.02,
+    )
+    mlm = BertForMaskedLM(cfg)
+    clf = BertForSequenceClassification(cfg, num_labels=2)
+
+    # Linear weights should have std ≈ 0.02 (tolerate finite-sample noise).
+    for name, w in [
+        ("mlm.transform[0]", mlm.mlm_head.transform[0].weight),
+        ("clf.pooler_dense", clf.head.pooler_dense.weight),
+        ("clf.classifier", clf.head.classifier.weight),
+    ]:
+        assert abs(w.std().item() - cfg.initializer_range) < 0.005, (
+            f"{name} std={w.std().item():.4f}, expected ≈ {cfg.initializer_range}"
+        )
+
+    # Biases must be zero.
+    assert torch.all(mlm.mlm_head.transform[0].bias == 0)
+    assert torch.all(mlm.mlm_head.decoder.bias == 0)
+    assert torch.all(clf.head.pooler_dense.bias == 0)
+    assert torch.all(clf.head.classifier.bias == 0)
+
+    # decoder.weight must remain tied to token embedding after init.
+    assert mlm.mlm_head.decoder.weight.data_ptr() == mlm.bert.embeddings.token.weight.data_ptr()
+
+
 def test_bert_forward():
     cfg = tiny_config()
     model = BertModel(cfg)
