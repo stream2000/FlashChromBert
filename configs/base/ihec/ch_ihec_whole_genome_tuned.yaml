@@ -4,6 +4,7 @@ tokenizer:
   type: kmer_cstate
   k: 4
   num_states: 18
+  vocab_file: /work/Users/lee/ch_temp_IHEC/genome_IHEC18_pretrain_result/vocab.txt
 
 masking:
   type: kmer_mask_list
