@@ -1,0 +1,48 @@
+seed: 42
+
+tokenizer:
+  type: kmer_cstate
+  k: 4
+  num_states: 18
+
+masking:
+  type: kmer_mask_list
+  k: 4
+  mlm_probability: 0.0375  # center-rate; × 4 (MASK_LIST k=4) = 15% effective
+
+data:
+  kind: stream
+  train_file: /work/Users/lee/dev/IHEC/pretrain/IHEC_all_genome_cut_4mer_wo_R_all_concatenated_css.txt
+  batch_size: 32
+  max_length: 512
+  num_workers: 4
+
+model:
+  hidden_size: 384
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 1536
+  max_position_embeddings: 512
+  hidden_dropout: 0.1
+  attention_dropout: 0.1
+
+optimizer:
+  type: schedule_free       # AdamWScheduleFree — no LR scheduler needed
+  learning_rate: 1.0e-4    # from legacy IHEC script
+  weight_decay: 0.001      # from legacy IHEC script
+  beta1: 0.9
+  beta2: 0.98              # from legacy IHEC script (Transformer standard)
+  adam_eps: 1.0e-6         # from legacy IHEC script
+  warmup_steps: 1000       # Added 1000 steps warmup for stability
+
+trainer:
+  max_steps: 100000             # ≈ 1 epoch over 16.9M samples (effective_batch=352), ~15h
+  precision: bf16-mixed
+  accelerator: gpu
+  devices: [1, 2, 3]
+  strategy: ddp
+  accumulate_grad_batches: 11   # 32 × 11 = 352 per rank, matching successful exp
+  gradient_clip_val: 1.0
+  log_every_n_steps: 200
+  save_every_n_train_steps: 500
+  ckpt_dir: checkpoints/ch_ihec_whole_genome_tuned

@@ -25,6 +25,7 @@ class LitBertMLM(L.LightningModule):
         beta1: float = 0.9,
         beta2: float = 0.999,
         adam_eps: float = 1e-8,
+        optimizer_type: str = "adamw",
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config"])
@@ -46,19 +47,45 @@ class LitBertMLM(L.LightningModule):
         self.log("val_ppl", torch.exp(out.loss), prog_bar=True, sync_dist=True)
         return out.loss
 
-    def configure_optimizers(self):
+    # Schedule-Free requires eval() mode during validation so the averaged
+    # weights are used for inference, then train() to resume updates.
+    def on_validation_epoch_start(self):
+        if self.hparams.optimizer_type == "schedule_free":
+            for opt in self.trainer.optimizers:
+                opt.eval()
+
+    def on_validation_epoch_end(self):
+        if self.hparams.optimizer_type == "schedule_free":
+            for opt in self.trainer.optimizers:
+                opt.train()
+
+    def _param_groups(self):
         no_decay = ("bias", "LayerNorm.weight", "norm.weight")
-        decay_params, nodecay_params = [], []
+        decay, nodecay = [], []
         for name, p in self.model.named_parameters():
             if not p.requires_grad:
                 continue
-            (nodecay_params if any(nd in name for nd in no_decay) else decay_params).append(p)
+            (nodecay if any(nd in name for nd in no_decay) else decay).append(p)
+        return [
+            {"params": decay, "weight_decay": self.hparams.weight_decay},
+            {"params": nodecay, "weight_decay": 0.0},
+        ]
+
+    def configure_optimizers(self):
+        if self.hparams.optimizer_type == "schedule_free":
+            from schedulefree import AdamWScheduleFree
+            optimizer = AdamWScheduleFree(
+                self._param_groups(),
+                lr=self.hparams.learning_rate,
+                betas=(self.hparams.beta1, self.hparams.beta2),
+                eps=self.hparams.adam_eps,
+                warmup_steps=self.hparams.warmup_steps,
+            )
+            optimizer.train()
+            return optimizer
 
         optimizer = AdamW(
-            [
-                {"params": decay_params, "weight_decay": self.hparams.weight_decay},
-                {"params": nodecay_params, "weight_decay": 0.0},
-            ],
+            self._param_groups(),
             lr=self.hparams.learning_rate,
             betas=(self.hparams.beta1, self.hparams.beta2),
             eps=self.hparams.adam_eps,

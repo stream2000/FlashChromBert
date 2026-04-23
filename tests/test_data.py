@@ -1,7 +1,13 @@
 import torch
+from unittest.mock import MagicMock
 
-from flashchrombert.data import CharTokenizer, MLMDataset, StandardMaskingStrategy
-from flashchrombert.data.dataset import collate_mlm
+from flashchrombert.data import (
+    CharTokenizer,
+    KmerCStateTokenizer,
+    MLMDataset,
+    StandardMaskingStrategy,
+)
+from flashchrombert.data.dataset import StreamingMLMDataset, collate_mlm
 
 
 def test_tokenizer_roundtrip():
@@ -54,3 +60,91 @@ def test_collate_pads_to_max_len_in_batch():
     assert out["attention_mask"].shape == (2, 6)
     assert out["attention_mask"][0].tolist() == [1, 1, 1, 1, 0, 0]
     assert out["attention_mask"][1].tolist() == [1, 1, 1, 1, 1, 1]
+
+
+# ---------------------------------------------------------------------------
+# StreamingMLMDataset tests
+# ---------------------------------------------------------------------------
+
+def test_streaming_dataset_yields_tensors(tmp_path):
+    f = tmp_path / "data.txt"
+    # 4-mer kmer_cstate format: space-separated 4-char tokens
+    tok = KmerCStateTokenizer(k=4, num_states=15)
+    line = " ".join(["AAAA"] * 10)
+    f.write_text(f"{line}\n{line}\n\n")  # two content lines, one empty
+
+    ds = StreamingMLMDataset(f, tok, max_length=12)
+    items = list(ds)
+    assert len(items) == 2  # one chunk per line (10 tokens < chunk_size=10)
+    for item in items:
+        assert isinstance(item, torch.Tensor)
+        assert item[0] == tok.cls_token_id
+        assert item[-1] == tok.sep_token_id
+        assert item.max() < tok.vocab_size
+
+
+def test_streaming_dataset_chunks_long_lines(tmp_path):
+    f = tmp_path / "data.txt"
+    tok = KmerCStateTokenizer(k=4, num_states=15)
+    # max_length=6 → chunk_size=4; 12 tokens → 3 chunks
+    line = " ".join(["AAAA"] * 12)
+    f.write_text(line + "\n")
+
+    ds = StreamingMLMDataset(f, tok, max_length=6)
+    items = list(ds)
+    assert len(items) == 3  # ceil(12 / 4) = 3
+    for item in items:
+        assert item[0] == tok.cls_token_id
+        assert item[-1] == tok.sep_token_id
+
+
+def test_streaming_dataset_worker_sharding(tmp_path):
+    """Each worker must see non-overlapping lines; union must be full dataset."""
+    f = tmp_path / "data.txt"
+    tok = KmerCStateTokenizer(k=4, num_states=15)
+    lines = [" ".join(["AAAA"] * 5)] * 6  # 6 lines
+    f.write_text("\n".join(lines) + "\n")
+
+    ds = StreamingMLMDataset(f, tok, max_length=512)
+
+    def _iter_as_worker(worker_id, num_workers):
+        info = MagicMock()
+        info.id = worker_id
+        info.num_workers = num_workers
+        import torch.utils.data
+        original = torch.utils.data.get_worker_info
+        torch.utils.data.get_worker_info = lambda: info
+        try:
+            return list(ds)
+        finally:
+            torch.utils.data.get_worker_info = original
+
+    items_w0 = _iter_as_worker(0, 2)
+    items_w1 = _iter_as_worker(1, 2)
+    # No overlap in line count: each worker gets exactly 3 of 6 lines
+    assert len(items_w0) == 3
+    assert len(items_w1) == 3
+
+
+# ---------------------------------------------------------------------------
+# KmerCStateTokenizer 18-state correctness
+# ---------------------------------------------------------------------------
+
+def test_kmer_18state_vocab_size():
+    tok = KmerCStateTokenizer(k=4, num_states=18)
+    # 18^4 = 104976, minus RRRR = 104975, plus 5 specials = 104980
+    assert tok.vocab_size == 104980
+
+
+def test_kmer_18state_excludes_rrrr():
+    tok = KmerCStateTokenizer(k=4, num_states=18)
+    assert "RRRR" not in tok.token_to_id
+
+
+def test_kmer_18state_encodes_valid_token():
+    tok = KmerCStateTokenizer(k=4, num_states=18)
+    # ABCD is a valid 18-state k=4 token
+    ids = tok.encode("ABCD", add_special=False)
+    assert len(ids) == 1
+    assert ids[0] >= 5  # not a special token id
+    assert ids[0] < tok.vocab_size

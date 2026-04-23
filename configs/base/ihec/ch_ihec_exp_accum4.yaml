@@ -1,0 +1,47 @@
+seed: 42
+
+tokenizer:
+  type: kmer_cstate
+  k: 4
+  num_states: 18
+
+masking:
+  type: kmer_mask_list
+  k: 4
+  mlm_probability: 0.0375  # center-rate × 4 = 15% effective
+
+data:
+  kind: stream
+  train_file: data/ihec_exp/chunk_100k.txt
+  batch_size: 32
+  max_length: 512
+  num_workers: 4
+
+model:
+  hidden_size: 384
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 1536
+  max_position_embeddings: 512
+  hidden_dropout: 0.1
+  attention_dropout: 0.1
+
+optimizer:
+  type: schedule_free
+  learning_rate: 1.0e-4
+  weight_decay: 0.001
+  beta1: 0.9
+  beta2: 0.98
+  adam_eps: 1.0e-6
+  warmup_steps: 50         # ~100k/352 ≈ 284 steps/epoch; 50 steps warmup 足够
+
+trainer:
+  max_steps: 1000           # ≈ 3.5 epoch over 100k samples (effective_batch=352)
+  precision: bf16-mixed
+  accelerator: gpu
+  devices: [1, 2, 3]
+  strategy: ddp
+  accumulate_grad_batches: 11  # 32 × 11 = 352 per rank, 接近 legacy 的 400
+  gradient_clip_val: 1.0
+  log_every_n_steps: 10        # 每 10 步记一次，方便看曲线
+  ckpt_dir: checkpoints/ihec_exp_accum4

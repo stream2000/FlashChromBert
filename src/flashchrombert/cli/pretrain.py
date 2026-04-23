@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 import lightning as L
+import torch
 import yaml
 from lightning.pytorch.callbacks import ModelCheckpoint
 
@@ -95,6 +96,7 @@ def load_config(path: str | Path) -> dict:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser("fcbert-pretrain")
     parser.add_argument("--config", required=True, help="YAML config path")
+    parser.add_argument("--resume", help="Path to checkpoint to resume from")
     args = parser.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -106,23 +108,48 @@ def main(argv: list[str] | None = None) -> None:
 
     dm = build_datamodule(cfg, tokenizer)
 
+    opt_cfg = cfg["optimizer"]
+    sched_cfg = cfg.get("scheduler", {})
+
+    # Try to get warmup_steps and total_steps from scheduler then optimizer
+    warmup_steps = sched_cfg.get("warmup_steps")
+    if warmup_steps is None:
+        warmup_steps = opt_cfg.get("warmup_steps", 0)
+
+    total_steps = sched_cfg.get("total_steps")
+    if total_steps is None:
+        total_steps = cfg["trainer"].get("max_steps", 1)
+
     lit_model = LitBertMLM(
         config=model_cfg,
-        learning_rate=cfg["optimizer"]["learning_rate"],
-        weight_decay=cfg["optimizer"].get("weight_decay", 0.01),
-        warmup_steps=cfg["scheduler"].get("warmup_steps", 1000),
-        total_steps=cfg["scheduler"]["total_steps"],
+        learning_rate=opt_cfg["learning_rate"],
+        weight_decay=opt_cfg.get("weight_decay", 0.01),
+        beta1=opt_cfg.get("beta1", 0.9),
+        beta2=opt_cfg.get("beta2", 0.999),
+        adam_eps=opt_cfg.get("adam_eps", 1e-8),
+        optimizer_type=opt_cfg.get("type", "adamw"),
+        warmup_steps=warmup_steps,
+        total_steps=total_steps,
     )
 
-    callbacks = [
-        ModelCheckpoint(
-            dirpath=cfg["trainer"].get("ckpt_dir", "checkpoints"),
-            filename="{epoch}-{val_loss:.3f}",
-            monitor="val_loss" if cfg["data"].get("val_file") else "train_loss",
-            save_top_k=3,
-            mode="min",
-        )
-    ]
+    has_val = bool(cfg["data"].get("val_file"))
+    monitor_metric = "val_loss" if has_val else "train_loss"
+    filename_fmt = "{epoch}-{val_loss:.3f}" if has_val else "{step}-{train_loss:.3f}"
+
+    checkpoint_kwargs = {
+        "dirpath": cfg["trainer"].get("ckpt_dir", "checkpoints"),
+        "filename": filename_fmt,
+        "monitor": monitor_metric,
+        "save_top_k": 3,
+        "mode": "min",
+    }
+    
+    if not has_val:
+        save_steps = cfg["trainer"].get("save_every_n_train_steps")
+        if save_steps:
+            checkpoint_kwargs["every_n_train_steps"] = save_steps
+
+    callbacks = [ModelCheckpoint(**checkpoint_kwargs)]
 
     trainer = L.Trainer(
         max_epochs=cfg["trainer"].get("max_epochs", 10),
@@ -137,7 +164,7 @@ def main(argv: list[str] | None = None) -> None:
         callbacks=callbacks,
     )
 
-    trainer.fit(lit_model, dm)
+    trainer.fit(lit_model, dm, ckpt_path=args.resume)
 
 
 if __name__ == "__main__":
